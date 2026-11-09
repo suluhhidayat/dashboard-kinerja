@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Kinerja Sederhana</title>
+<style>
+  :root {
+    --bg: #F5F3EE; --card: #FFFFFF; --ink: #1C2333; --muted: #5B6272;
+    --line: #E1DDD3; --bar: #2D5BD8; --target: #1C2333;
+    --good: #1E7B4A; --bad: #B42318;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--ink); }
+  header { padding: 24px 32px 8px; }
+  h1 { margin: 0 0 4px; font-size: 26px; }
+  .sub { color: var(--muted); margin: 0; font-size: 14px; }
+  main { padding: 16px 32px 40px; display: grid; gap: 20px; max-width: 1100px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+  .tile .label { color: var(--muted); font-size: 13px; }
+  .tile .value { font-size: 40px; font-weight: bold; margin: 6px 0 4px; }
+  .tile .note { font-size: 13px; }
+  .ok { color: var(--good); } .no { color: var(--bad); }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 20px; }
+  h2 { font-size: 17px; margin: 0 0 4px; }
+  .hint { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+  /* grafik batang horizontal sederhana */
+  .row { display: grid; grid-template-columns: 70px 1fr 64px; align-items: center; gap: 10px; margin: 10px 0; font-size: 14px; }
+  .track { position: relative; height: 22px; }
+  .bar { height: 100%; background: var(--bar); border-radius: 0 4px 4px 0; cursor: default; }
+  .bar:hover { opacity: .85; }
+  .targetline { position: absolute; top: -5px; bottom: -5px; width: 2px; background: var(--target); }
+  .targetlabel { position: absolute; top: -20px; font-size: 11px; color: var(--muted); transform: translateX(-50%); white-space: nowrap; }
+  .pct { text-align: right; font-weight: bold; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { background: #F0EDE6; }
+  td.num, th.num { text-align: right; }
+  .filters { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; font-size: 14px; flex-wrap: wrap; }
+  select { padding: 6px 8px; font-size: 14px; }
+  #tooltip { position: fixed; pointer-events: none; background: var(--ink); color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 13px; display: none; }
+  #fallback { display: none; }
+  /* menu */
+  nav { display: flex; gap: 4px; padding: 12px 32px 0; border-bottom: 1px solid var(--line); }
+  nav a { padding: 10px 18px; text-decoration: none; color: var(--muted); font-weight: bold; font-size: 15px; border-bottom: 3px solid transparent; }
+  nav a:hover { color: var(--ink); }
+  nav a.active { color: var(--bar); border-bottom-color: var(--bar); }
+  .page { display: none; gap: 20px; }
+  .page.show { display: grid; }
+  a.link { text-decoration: none; color: inherit; }
+  a.link:hover { border-color: var(--bar); }
+  .temuan { margin: 0; padding-left: 20px; line-height: 1.8; font-size: 15px; }
+  /* kartu per orang */
+  .warn { color: #8A5A00; }
+  .people { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .person { background: var(--card); border: 1px solid var(--line); border-top: 5px solid var(--line); border-radius: 16px; padding: 20px; }
+  .person.ok, .person.warn, .person.no { color: var(--ink); }
+  .person.ok { border-top-color: var(--good); } .person.warn { border-top-color: #D99A1E; } .person.no { border-top-color: var(--bad); }
+  .person.click { cursor: pointer; transition: transform .15s, box-shadow .15s; }
+  .person.click:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(28,35,51,.08); }
+  .ph { display: flex; align-items: center; gap: 12px; }
+  .avatar { width: 48px; height: 48px; border-radius: 50%; background: #E3EAFB; color: var(--bar); font-weight: bold; font-size: 18px; display: flex; align-items: center; justify-content: center; flex: none; }
+  .pname { font-weight: bold; font-size: 17px; }
+  .prole { color: var(--muted); font-size: 13px; }
+  .pill { margin-left: auto; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: bold; white-space: nowrap; }
+  .pill.ok { background: #E3F4EA; color: var(--good); } .pill.warn { background: #FFF1D6; color: #8A5A00; } .pill.no { background: #FDE7E5; color: var(--bad); }
+  .big { font-size: 44px; font-weight: bold; margin: 16px 0 8px; }
+  .big small { font-size: 14px; color: var(--muted); font-weight: normal; }
+  .prog { position: relative; height: 10px; background: #EEEAE2; border-radius: 999px; }
+  .prog .fill { height: 100%; background: var(--bar); border-radius: 999px; }
+  .prog .tgt { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); }
+  .progcap { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+  .stats b { display: block; font-size: 15px; color: var(--ink); margin-top: 2px; }
+  footer { color: var(--muted); font-size: 12px; padding: 0 32px 24px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Dashboard Kinerja Sederhana</h1>
+  <p class="sub">Mata kuliah Teknologi Kinerja · Data contoh (dummy) dari folder <code>data/</code></p>
+</header>
+<nav>
+  <a href="#ringkasan" data-menu="ringkasan">Ringkasan</a>
+  <a href="#sales" data-menu="sales">Sales</a>
+  <a href="#itsupport" data-menu="itsupport">IT Support</a>
+</nav>
+
+<main>
+  <!-- Muncul hanya jika file dibuka langsung (tanpa server) dan data gagal dibaca -->
+  <div id="fallback" class="card">
+    <h2>Data belum terbaca</h2>
+    <p class="hint">Browser memblokir pembacaan file saat index.html dibuka langsung. Pilih kedua file CSV dari folder <code>data/</code>:</p>
+    <input type="file" id="pick" accept=".csv" multiple>
+  </div>
+
+  <!-- ===== MENU 1: RINGKASAN ===== -->
+  <div class="page" id="page-ringkasan">
+    <section class="tiles">
+      <a class="card tile link" href="#sales"><div class="label">Capaian revenue tim sales</div><div class="value" id="t-sales">–</div><div class="note" id="t-sales-note"></div></a>
+      <a class="card tile link" href="#itsupport"><div class="label">Tiket IT selesai tepat waktu</div><div class="value" id="t-sla">–</div><div class="note" id="t-sla-note"></div></a>
+      <a class="card tile link" href="#itsupport"><div class="label">Jumlah tiket masuk</div><div class="value" id="t-tiket">–</div><div class="note">Periode Juni</div></a>
+    </section>
+    <section class="card">
+      <h2>Temuan</h2>
+      <p class="hint">Dihitung otomatis dari data. Klik kartu di atas untuk melihat detail.</p>
+      <ul id="temuan" class="temuan"></ul>
+    </section>
+  </div>
+
+  <!-- ===== MENU 2: SALES ===== -->
+  <div class="page" id="page-sales">
+    <section class="people" id="people-sales"></section>
+    <section class="card">
+      <h2>Perbandingan capaian per sales</h2>
+      <p class="hint">Capaian = aktual ÷ target. Garis hitam = target 100%.</p>
+      <div id="chart-sales"></div>
+    </section>
+    <section class="card">
+      <h2>Data Penjualan dari ERP</h2>
+      <p class="hint">Contoh hasil ekspor modul Penjualan di sistem ERP (dummy). Status: ≥100% tercapai · 90–99% perlu perhatian · &lt;90% perlu intervensi</p>
+      <table id="tbl-sales"></table>
+    </section>
+  </div>
+
+  <!-- ===== MENU 3: IT SUPPORT ===== -->
+  <div class="page" id="page-itsupport">
+    <section class="people" id="people-sla"></section>
+    <section class="card">
+      <h2>Perbandingan tepat waktu per teknisi</h2>
+      <p class="hint">Tepat waktu = selesai sebelum batas SLA. Garis hitam = target 90%.</p>
+      <div id="chart-sla"></div>
+    </section>
+    <section class="card" id="sec-tiket">
+      <h2>Data Tiket dari Sistem Helpdesk</h2>
+      <p class="hint">Contoh hasil ekspor aplikasi Helpdesk IT (dummy). Batas SLA: Tinggi 4 jam · Sedang 8 jam · Rendah 24 jam</p>
+      <div class="filters">
+        <label>Teknisi <select id="f-teknisi"><option value="">Semua</option></select></label>
+        <label>Status <select id="f-status"><option value="">Semua</option><option>Tepat waktu</option><option>Terlambat</option></select></label>
+        <span id="f-count" class="hint" style="margin:0"></span>
+      </div>
+      <table id="tbl-tiket"></table>
+    </section>
+  </div>
+</main>
+<footer>Edit data di <code>data/sales.csv</code> dan <code>data/tiket.csv</code>, lalu muat ulang halaman.</footer>
+<div id="tooltip"></div>
+
+<script>
+// ===== 1. ATURAN KINERJA (sama dengan rumus di Excel) =====
+const TARGET_SALES = 1.00;          // 100%
+const TARGET_SLA = 0.90;            // 90%
+const BATAS_SLA = { Tinggi: 4, Sedang: 8, Rendah: 24 }; // jam
+
+function statusSales(capaian) {
+  if (capaian >= 1.00) return "Tercapai";
+  if (capaian >= 0.90) return "Perlu perhatian";
+  return "Perlu intervensi";
+}
+
+// ===== 2. BACA FILE CSV =====
+function parseCSV(text) {
+  const [head, ...rows] = text.trim().split(/\r?\n/);
+  const keys = head.split(",");
+  return rows.filter(r => r.trim()).map(r => {
+    const v = r.split(",");
+    return Object.fromEntries(keys.map((k, i) => [k.trim(), (v[i] || "").trim()]));
+  });
+}
+
+const rupiah = n => (n < 0 ? "−Rp" : "Rp") + Math.abs(Math.round(n)).toLocaleString("id-ID");
+const persen = x => Math.round(x * 100) + "%";
+
+// ===== 3. HITUNG KPI & TAMPILKAN =====
+function render(salesRows, tiketRows) {
+  // --- Sales ---
+  const sales = salesRows.map(r => {
+    const target = +r.target, aktual = +r.aktual, capaian = aktual / target;
+    return { nama: r.nama, target, aktual, capaian, gap: aktual - target, status: statusSales(capaian) };
+  });
+  const totT = sales.reduce((a, s) => a + s.target, 0);
+  const totA = sales.reduce((a, s) => a + s.aktual, 0);
+  const capTim = totA / totT;
+
+  // --- Tiket ---
+  const tiket = tiketRows.map(r => {
+    const jam = +r.waktu_selesai_jam, batas = BATAS_SLA[r.prioritas];
+    return { ...r, jam, batas, status: jam <= batas ? "Tepat waktu" : "Terlambat" };
+  });
+  const teknisiList = [...new Set(tiket.map(t => t.teknisi))];
+  const perTeknisi = teknisiList.map(nama => {
+    const milik = tiket.filter(t => t.teknisi === nama);
+    const tepat = milik.filter(t => t.status === "Tepat waktu").length;
+    const rataJam = milik.reduce((a, t) => a + t.jam, 0) / milik.length;
+    return { nama, jumlah: milik.length, tepat, terlambat: milik.length - tepat, rataJam, persen: tepat / milik.length };
+  });
+  const slaTim = tiket.filter(t => t.status === "Tepat waktu").length / tiket.length;
+
+  // --- Kartu angka ---
+  setTile("t-sales", capTim, TARGET_SALES, "target");
+  setTile("t-sla", slaTim, TARGET_SLA, "target");
+  document.getElementById("t-tiket").textContent = tiket.length;
+
+  // --- Temuan otomatis (untuk menu Ringkasan) ---
+  const salesBawah = sales.filter(s => s.capaian < TARGET_SALES);
+  const tekBawah = perTeknisi.filter(p => p.persen < TARGET_SLA);
+  const temuan = [
+    `Capaian sales tim ${persen(capTim)} (${capTim >= TARGET_SALES ? "sesuai" : "di bawah"} target ${persen(TARGET_SALES)}).`,
+    salesBawah.length ? `Sales di bawah target: ${salesBawah.map(s => `${s.nama} (${persen(s.capaian)})`).join(", ")}.` : "Semua sales mencapai target.",
+    `Tiket tepat waktu tim ${persen(slaTim)} (${slaTim >= TARGET_SLA ? "sesuai" : "di bawah"} target ${persen(TARGET_SLA)}).`,
+    tekBawah.length ? `Teknisi di bawah target: ${tekBawah.map(p => `${p.nama} (${persen(p.persen)})`).join(", ")}. Rata-rata tim bisa menutupi masalah individu.` : "Semua teknisi sesuai target.",
+  ];
+  document.getElementById("temuan").innerHTML = temuan.map(t => `<li>${t}</li>`).join("");
+
+  // --- Kartu per orang ---
+  document.getElementById("people-sales").innerHTML = sales.map(s => personCard({
+    nama: s.nama, peran: "Sales", nilai: s.capaian, target: TARGET_SALES, skala: 1.2,
+    status: s.status, kelas: kelasStatus(s.status),
+    stats: [["Target", rupiah(s.target)], ["Aktual", rupiah(s.aktual)], ["Gap", rupiah(s.gap)], ["Status", s.status]],
+  })).join("");
+  document.getElementById("people-sla").innerHTML = perTeknisi.map(p => {
+    const st = p.persen >= TARGET_SLA ? "Sesuai target" : "Di bawah target";
+    return personCard({
+      nama: p.nama, peran: "Teknisi IT Support", nilai: p.persen, target: TARGET_SLA, skala: 1.0,
+      status: st, kelas: kelasStatus(st), klik: true,
+      stats: [["Jumlah tiket", p.jumlah], ["Tepat waktu", p.tepat], ["Terlambat", p.terlambat], ["Rata-rata selesai", p.rataJam.toFixed(1) + " jam"]],
+    });
+  }).join("");
+  // klik kartu teknisi -> tabel tiket otomatis difilter ke teknisi itu
+  document.querySelectorAll("#people-sla .person").forEach(card => card.onclick = () => {
+    document.getElementById("f-teknisi").value = card.dataset.nama;
+    document.getElementById("f-teknisi").onchange();
+    document.getElementById("sec-tiket").scrollIntoView({ behavior: "smooth" });
+  });
+
+  // --- Grafik ---
+  drawBars("chart-sales", sales.map(s => ({ label: s.nama, value: s.capaian,
+    tip: `${s.nama}: ${persen(s.capaian)} · ${rupiah(s.aktual)} dari ${rupiah(s.target)}` })), TARGET_SALES, 1.2);
+  drawBars("chart-sla", perTeknisi.map(p => ({ label: p.nama, value: p.persen,
+    tip: `${p.nama}: ${p.tepat} dari ${p.jumlah} tiket tepat waktu` })), TARGET_SLA, 1.0);
+
+  // --- Tabel sales ---
+  document.getElementById("tbl-sales").innerHTML =
+    `<tr><th>Sales</th><th class="num">Target</th><th class="num">Aktual</th><th class="num">Capaian</th><th class="num">Gap</th><th>Status</th></tr>` +
+    sales.map(s => `<tr><td>${s.nama}</td><td class="num">${rupiah(s.target)}</td><td class="num">${rupiah(s.aktual)}</td>
+      <td class="num">${persen(s.capaian)}</td><td class="num">${rupiah(s.gap)}</td><td>${badge(s.status, s.status === "Tercapai")}</td></tr>`).join("") +
+    `<tr><th>Total tim</th><th class="num">${rupiah(totT)}</th><th class="num">${rupiah(totA)}</th><th class="num">${persen(capTim)}</th><th class="num">${rupiah(totA - totT)}</th><th>${badge(statusSales(capTim), capTim >= TARGET_SALES)}</th></tr>`;
+
+  // --- Tabel tiket + filter ---
+  const fTek = document.getElementById("f-teknisi");
+  fTek.innerHTML = `<option value="">Semua</option>` + teknisiList.map(n => `<option>${n}</option>`).join("");
+  const fSt = document.getElementById("f-status");
+  const drawTiket = () => {
+    const rows = tiket.filter(t => (!fTek.value || t.teknisi === fTek.value) && (!fSt.value || t.status === fSt.value));
+    document.getElementById("f-count").textContent = `${rows.length} tiket`;
+    document.getElementById("tbl-tiket").innerHTML =
+      `<tr><th>No tiket</th><th>Teknisi</th><th>Prioritas</th><th class="num">Waktu selesai (jam)</th><th class="num">Batas SLA (jam)</th><th>Status</th></tr>` +
+      rows.map(t => `<tr><td>${t.no_tiket}</td><td>${t.teknisi}</td><td>${t.prioritas}</td><td class="num">${t.jam}</td>
+        <td class="num">${t.batas}</td><td>${badge(t.status, t.status === "Tepat waktu")}</td></tr>`).join("");
+  };
+  fTek.onchange = fSt.onchange = drawTiket;
+  drawTiket();
+}
+
+// 3 warna status: hijau = aman, kuning = perlu perhatian, merah = perlu tindakan
+function kelasStatus(status) {
+  if (["Tercapai", "Tepat waktu", "Sesuai target"].includes(status)) return "ok";
+  if (status === "Perlu perhatian") return "warn";
+  return "no";
+}
+const IKON = { ok: "✔", warn: "▲", no: "✖" };
+
+function badge(text) {
+  const k = kelasStatus(text);
+  return `<span class="${k}">${IKON[k]} ${text}</span>`;
+}
+
+// Kartu satu orang: inisial, nama, status, angka besar, progress bar ke target, detail
+function personCard(o) {
+  const inisial = o.nama.split(" ").map(k => k[0]).join("").slice(0, 2).toUpperCase();
+  const isi = Math.min(o.nilai / o.skala, 1) * 100, garis = o.target / o.skala * 100;
+  return `<div class="person ${o.kelas} ${o.klik ? "click" : ""}" data-nama="${o.nama}">
+    <div class="ph"><div class="avatar">${inisial}</div>
+      <div><div class="pname">${o.nama}</div><div class="prole">${o.peran}</div></div>
+      <span class="pill ${o.kelas}">${IKON[o.kelas]} ${o.status}</span></div>
+    <div class="big">${persen(o.nilai)} <small>dari target ${persen(o.target)}</small></div>
+    <div class="prog"><div class="fill" style="width:${isi}%"></div><div class="tgt" style="left:${garis}%"></div></div>
+    <div class="progcap">Garis hitam = target</div>
+    <div class="stats">${o.stats.map(([k, v]) => `<div>${k}<b>${v}</b></div>`).join("")}</div>
+    ${o.klik ? `<div class="progcap" style="margin-top:12px">Klik untuk lihat tiket ${o.nama} →</div>` : ""}
+  </div>`;
+}
+
+function setTile(id, value, target, word) {
+  document.getElementById(id).textContent = persen(value);
+  const ok = value >= target;
+  document.getElementById(id + "-note").innerHTML =
+    `<span class="${ok ? "ok" : "no"}">${ok ? "✔ Sesuai" : "✖ Di bawah"} ${word} ${persen(target)}</span>`;
+}
+
+// Grafik batang horizontal: panjang batang = nilai, garis = target
+function drawBars(id, items, target, maxScale) {
+  const el = document.getElementById(id);
+  el.innerHTML = items.map(it => {
+    const w = Math.min(it.value / maxScale, 1) * 100;
+    const t = target / maxScale * 100;
+    return `<div class="row"><span>${it.label}</span>
+      <div class="track"><div class="bar" style="width:${w}%" data-tip="${it.tip}"></div>
+      <div class="targetline" style="left:${t}%"></div></div>
+      <span class="pct">${persen(it.value)}</span></div>`;
+  }).join("") + `<div class="row"><span></span><div class="track" style="height:0"><span class="targetlabel" style="left:${target / maxScale * 100}%; top:2px">target ${persen(target)}</span></div><span></span></div>`;
+}
+
+// Tooltip saat kursor di atas batang
+const tip = document.getElementById("tooltip");
+document.addEventListener("mousemove", e => {
+  const t = e.target.dataset && e.target.dataset.tip;
+  if (t) { tip.textContent = t; tip.style.display = "block"; tip.style.left = e.clientX + 12 + "px"; tip.style.top = e.clientY + 12 + "px"; }
+  else tip.style.display = "none";
+});
+
+// ===== 4. MENU: tampilkan satu halaman sesuai alamat (#ringkasan, #sales, #itsupport) =====
+function bukaMenu() {
+  const menu = (location.hash || "#ringkasan").slice(1);
+  document.querySelectorAll(".page").forEach(p => p.classList.toggle("show", p.id === "page-" + menu));
+  document.querySelectorAll("nav a").forEach(a => a.classList.toggle("active", a.dataset.menu === menu));
+}
+window.addEventListener("hashchange", bukaMenu);
+bukaMenu();
+
+// ===== 5. MULAI: ambil data dari folder data/ =====
+Promise.all([fetch("data/sales.csv"), fetch("data/tiket.csv")])
+  .then(res => Promise.all(res.map(r => { if (!r.ok) throw new Error(); return r.text(); })))
+  .then(([s, t]) => render(parseCSV(s), parseCSV(t)))
+  .catch(() => {
+    // Cadangan: pilih file CSV manual jika halaman dibuka tanpa server
+    document.getElementById("fallback").style.display = "block";
+    document.getElementById("pick").onchange = async e => {
+      const files = [...e.target.files];
+      const get = name => files.find(f => f.name.includes(name));
+      if (!get("sales") || !get("tiket")) { alert("Pilih sales.csv dan tiket.csv sekaligus."); return; }
+      render(parseCSV(await get("sales").text()), parseCSV(await get("tiket").text()));
+      document.getElementById("fallback").style.display = "none";
+    };
+  });
+</script>
+</body>
+</html>
